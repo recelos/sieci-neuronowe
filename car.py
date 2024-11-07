@@ -29,9 +29,13 @@ class Car:
             self.rect.centery = 1
         if self.rect.centery >= self.win_height:
             self.rect.centery = self.win_height - 1
+        print("old pos", self.rect.x, self.rect.y, "speed:", self.speed, "rot", self.rotation)
+        
+        self.rotation = min(self.rotation, 90)
         radians = math.radians(self.rotation)
         self.rect.x += self.speed * math.sin(radians)
         self.rect.y -= self.speed * math.cos(radians)
+        print("new pos", self.rect.x, self.rect.y, "speed", self.speed, "rot", self.rotation)
         self.distance += self.speed
         self.time_alive += 1
 
@@ -74,8 +78,9 @@ class Car:
             self.radars[i] = self.radar(win, angle)
 
     def reward(self):
+        # TODO: add punishment for idle standing
         weight = 0.6
-        return self.distance * weight + self.time_alive * (1 - weight)
+        return self.distance * weight + self.time_alive * (1 - weight) / 50
     
     def get_input_data(self):
         return [radar / 50 for radar in self.radars]
