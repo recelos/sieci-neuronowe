@@ -15,7 +15,7 @@ def run_simulation(genomes, config):
     nets = []
     cars = []
 
-    for _, g in genomes:
+    for genome_id, g in genomes:
         net = neat.nn.FeedForwardNetwork.create(g, config)
         nets.append(net)
         g.fitness = 0
@@ -24,40 +24,45 @@ def run_simulation(genomes, config):
 
     clock = pygame.time.Clock()
     speed_interval = 0.1
-    max_speed = 0.5
+    max_speed = 4 #speed multiplier
     rotation_speed = 5
+
+    max_generation_time = 500 #in seconds
+    generation_time = 0
 
     while True:
         win.blit(map, (0, 0))
+        generation_time += 1
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 sys.exit(0)
 
         for index, car in enumerate(cars):
-            output = nets[index].activate(car.get_input_data())
+            if car.get_is_alive():
+                output = nets[index].activate(car.get_input_data())
 
-            speed_control = output[0]
-            rotation_control = output[1]
-            if speed_control > 0.5:
-                car.speed = min(car.speed + speed_interval, max_speed)
-            elif speed_control < -0.5:
-                car.speed = max(car.speed - speed_interval, -max_speed)
-            else:
-                car.speed = 0
-            
-            if rotation_control > 0.5:
-                car.rotation += rotation_speed
-            elif rotation_control < -0.5:
-                car.rotation -= rotation_speed
+                speed_control = output[0]
+                rotation_control = output[1]
+                if speed_control > 0:
+                    car.speed = min(car.speed + speed_interval, max_speed)
+                else:
+                    car.speed = max(car.speed - speed_interval, -max_speed)
+                
+                if rotation_control > 0:
+                    car.rotation += rotation_speed
+                else:
+                    car.rotation -= rotation_speed
 
         remain_cars = 0
         for i, car in enumerate(cars):
             if car.get_is_alive():
                 remain_cars += 1
                 car.update(win)
-                genomes[i][1].fitness += car.reward()
-        print(remain_cars)
-        if remain_cars == 0:
+                genomes[i][1].fitness = car.reward()
+            else:
+                genomes[i][1].fitness -= 1  #penalize for crashing
+
+        if remain_cars == 0 or generation_time > max_generation_time:
             break
 
         for car in cars:
@@ -65,7 +70,7 @@ def run_simulation(genomes, config):
                 car.draw(win)
 
         pygame.display.flip()
-        clock.tick(0)
+        clock.tick(60) #limit 60 fps
 
 def run(config_file):
     config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
@@ -77,8 +82,8 @@ def run(config_file):
     p.add_reporter(neat.StdOutReporter(True))
     stats = neat.StatisticsReporter()
     p.add_reporter(stats)
-    p.add_reporter(neat.Checkpointer(5))
-    p.run(run_simulation, 50)
+    p.add_reporter(neat.Checkpointer(10)) #save checkpoint after ... generations
+    p.run(run_simulation, 100)  #number of generations
 
 if __name__ == "__main__":
     local_dir = os.path.dirname(__file__)
