@@ -24,9 +24,9 @@ def run_simulation(genomes, config):
 
     clock = pygame.time.Clock()
     speed_interval = 0.1
-    max_speed = 2
+    max_speed = 3
     rotation_speed = 5
-    max_generation_time = 1200
+    max_generation_time = 2500
     generation_time = 0
 
     while True:
@@ -61,15 +61,11 @@ def run_simulation(genomes, config):
                 car.update(win)
                 genomes[i][1].fitness = car.reward()
                 # Penalize for excessive rotation
-                if car.total_rotation > 7000:  
+                if car.total_rotation > 5000:  
                     genomes[i][1].fitness -= 5
                     car.is_alive = False
                     print(f"Car {i} is rotating too much.")
                 # Penalize for very low speed
-                if abs(car.speed) < 0.2: 
-                    #genomes[i][1].fitness -= 1
-                    #print(f"Car {i} is moving too slow.")
-                    pass
                 if car.speed < 0:
                     genomes[i][1].fitness -= 5
                     car.is_alive = False
