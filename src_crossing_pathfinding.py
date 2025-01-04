@@ -112,6 +112,15 @@ class ObstacleCar(Car):
         self.rect.x += speed * math.sin(radians)
         self.rect.y -= speed * math.cos(radians)
 
+        if self.direction == ObstacleDirection.TOP:
+            self.is_alive = False if self.rect.y >= stop_lines[ObstacleDirection.BOTTOM] else True
+        elif self.direction == ObstacleDirection.BOTTOM:
+            self.is_alive = False if self.rect.y <= stop_lines[ObstacleDirection.TOP] else True
+        elif self.direction == ObstacleDirection.LEFT:
+            self.is_alive = False if self.rect.x >= stop_lines[ObstacleDirection.RIGHT] else True
+        else:
+            self.is_alive = False if self.rect.x <= stop_lines[ObstacleDirection.LEFT] else True
+
 def run_simulation(genomes, config):
     pygame.init()
     win = pygame.display.set_mode((WIDTH, HEIGHT))
