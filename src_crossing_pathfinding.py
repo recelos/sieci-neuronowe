@@ -33,11 +33,11 @@ def run_simulation(genomes, config):
         # pos_x, pos_y, speed, rotation
         LEFT = [(10, 190), 1, 90]
         RIGHT = [(660, 190), 1, 270]
-        TOP = [(341, 10), 1, 180]
+        TOP = [(341, 50), 1, 180]
 
-    obstacle_positions = [ObstacleInitialData.LEFT[0], ObstacleInitialData.RIGHT[0]]
-    obstacle_speeds = [ObstacleInitialData.LEFT[1], ObstacleInitialData.RIGHT[1]]
-    obstacle_rotations = [ObstacleInitialData.LEFT[2], ObstacleInitialData.RIGHT[2]]
+    obstacle_positions = [ObstacleInitialData.LEFT[0], ObstacleInitialData.TOP[0]]
+    obstacle_speeds = [ObstacleInitialData.LEFT[1], ObstacleInitialData.TOP[1]]
+    obstacle_rotations = [ObstacleInitialData.LEFT[2], ObstacleInitialData.TOP[2]]
 
     for i in range(len(obstacle_positions)):
         obstacles.append(ObstacleCar(map, WIDTH, HEIGHT, obstacle_positions[i], 30, 0, obstacle_speeds[i], obstacle_rotations[i]))
