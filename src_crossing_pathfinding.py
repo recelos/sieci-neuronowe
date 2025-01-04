@@ -1,6 +1,6 @@
 import os
 import pygame
-from car import Car, ObstacleCar
+from car import Car
 import neat
 import sys
 import random
@@ -9,6 +9,98 @@ from enum import Enum
 
 WIDTH, HEIGHT = 683, 384
 
+car_size = 30
+
+obstacles_speed = 1.5
+obstacles_rot = 90
+
+class ObstacleDirection(Enum):
+    TOP = ((310, 50), obstacles_speed, 2 * obstacles_rot) 
+    BOTTOM = ((351, 334), obstacles_speed, 0)
+    LEFT = ((40, 220), obstacles_speed, obstacles_rot)
+    RIGHT = ((640, 160), obstacles_speed, 3 * obstacles_rot)
+
+priority_order = [
+    ObstacleDirection.TOP,
+    ObstacleDirection.RIGHT,
+    ObstacleDirection.BOTTOM,
+    ObstacleDirection.LEFT
+]
+
+stop_lines = {
+    ObstacleDirection.TOP: 140 - car_size,
+    ObstacleDirection.BOTTOM: 234 - car_size,
+    ObstacleDirection.LEFT: 255 - car_size,
+    ObstacleDirection.RIGHT: 397 - car_size
+}
+
+active_obstacles = {
+    ObstacleDirection.TOP: [],
+    ObstacleDirection.BOTTOM: [],
+    ObstacleDirection.LEFT: [],
+    ObstacleDirection.RIGHT: []
+}
+
+def clear_obstacles():
+    active_obstacles[ObstacleDirection.TOP].clear()
+    active_obstacles[ObstacleDirection.BOTTOM].clear()
+    active_obstacles[ObstacleDirection.LEFT].clear()
+    active_obstacles[ObstacleDirection.RIGHT].clear()
+
+def has_priority(current_dir):
+    # Check if any car in the direction to the right has priority and is near stop line
+    index = priority_order.index(current_dir)
+    right_priority = priority_order[(index - 1) % len(priority_order)]
+    for obs in active_obstacles[right_priority]:
+        if obs.speed > 0:
+            if (right_priority in [ObstacleDirection.TOP, ObstacleDirection.BOTTOM] and
+                abs(obs.rect.y - stop_lines[right_priority]) <= 5) or \
+               (right_priority in [ObstacleDirection.LEFT, ObstacleDirection.RIGHT] and
+                abs(obs.rect.x - stop_lines[right_priority]) <= 5):
+                return False
+    return True
+
+class ObstacleCar(Car):
+    def __init__(self, map, win_width, win_height, start_pos, car_size, radars_count, speed, rotation, direction):
+        super().__init__(map, win_width, win_height, start_pos, car_size, radars_count)
+        self.rect = self.image.get_rect(center=start_pos)
+        self.speed = speed
+        self.rotation = rotation
+        self.direction = direction
+        self.stop_position = stop_lines[direction]
+
+    def auto_move(self):
+        if not has_priority(self.direction):
+            self.speed = 0  # Stop if no priority
+        else:
+            front_car = active_obstacles[self.direction][0] if active_obstacles[self.direction] else None
+            if front_car and front_car != self:
+                distance = 20
+                if self.direction in [ObstacleDirection.TOP, ObstacleDirection.BOTTOM]:
+                    if abs(self.rect.y - front_car.rect.y) > distance:
+                        self.speed = 1
+                    else:
+                        self.speed = 0
+                else:
+                    if abs(self.rect.x - front_car.rect.x) > distance:
+                        self.speed = 1
+                    else:
+                        self.speed = 0
+            else:
+                if self.direction in [ObstacleDirection.TOP, ObstacleDirection.BOTTOM]:
+                    if abs(self.rect.y - self.stop_position) > 5:
+                        self.speed = 1
+                    else:
+                        self.speed = 0
+                else:
+                    if abs(self.rect.x - self.stop_position) > 5:
+                        self.speed = 1
+                    else:
+                        self.speed = 0
+
+        radians = math.radians(self.rotation)
+        self.rect.x += self.speed * math.sin(radians)
+        self.rect.y -= self.speed * math.cos(radians)
 
 def run_simulation(genomes, config):
     pygame.init()
@@ -28,20 +120,7 @@ def run_simulation(genomes, config):
         nets.append(net)
         g.fitness = 0
 
-        cars.append(Car(map, WIDTH, HEIGHT, starting_positions[i % len(starting_positions)], 30, config.genome_config.num_inputs))
-
-    class ObstacleInitialData():
-        # pos_x, pos_y, speed, rotation
-        LEFT = [(10, 190), 1, 90]
-        RIGHT = [(660, 190), 1, 270]
-        TOP = [(341, 50), 1, 180]
-
-    obstacle_positions = [ObstacleInitialData.LEFT[0], ObstacleInitialData.TOP[0]]
-    obstacle_speeds = [ObstacleInitialData.LEFT[1], ObstacleInitialData.TOP[1]]
-    obstacle_rotations = [ObstacleInitialData.LEFT[2], ObstacleInitialData.TOP[2]]
-
-    for i in range(len(obstacle_positions)):
-        obstacles.append(ObstacleCar(map, WIDTH, HEIGHT, obstacle_positions[i], 30, 0, obstacle_speeds[i], obstacle_rotations[i]))
+        cars.append(Car(map, WIDTH, HEIGHT, starting_positions[i % len(starting_positions)], car_size, config.genome_config.num_inputs))
 
     clock = pygame.time.Clock()
     speed_interval = 0.1
@@ -50,13 +129,6 @@ def run_simulation(genomes, config):
     max_generation_time = 1200
     generation_time = 0
     obstacle_timer = 0
-    obstacle_interval = 120  # 5 seconds at 60 FPS
-
-    predefined_obstacles = [
-        (ObstacleInitialData.LEFT[0], ObstacleInitialData.LEFT[1], ObstacleInitialData.LEFT[2]),
-        (ObstacleInitialData.TOP[0], ObstacleInitialData.TOP[1], ObstacleInitialData.TOP[2])
-    ]
-    predefined_obstacle_index = 0
 
     while True:
         win.blit(map, (0, 0))
@@ -67,18 +139,28 @@ def run_simulation(genomes, config):
             if event.type == pygame.QUIT:
                 sys.exit(0)
 
-        # Generate new obstacles every 5 seconds
-        if obstacle_timer >= obstacle_interval:
+        if obstacle_timer >= 30:
             obstacle_timer = 0
-            if predefined_obstacle_index < len(predefined_obstacles):
-                new_obstacle_pos, new_obstacle_speed, new_obstacle_rotation = predefined_obstacles[predefined_obstacle_index]
-                obstacles.append(ObstacleCar(map, WIDTH, HEIGHT, new_obstacle_pos, 30, 0, new_obstacle_speed, new_obstacle_rotation))
-                predefined_obstacle_index += 1
+            direction = random.choice(list(ObstacleDirection))
 
-        # Move obstacle cars automatically
+            if len(active_obstacles[direction]) < 2:  # Max 2 obstacles per direction
+                start_pos, speed, rotation = direction.value[:3]
+                new_obstacle = ObstacleCar(map, WIDTH, HEIGHT, start_pos, car_size, 0, speed, rotation, direction)
+                obstacles.append(new_obstacle)
+                active_obstacles[direction].append(new_obstacle)
+
+        # Move and draw obstacles
         for obs in obstacles:
             obs.auto_move()
             obs.draw(win)
+
+            # Remove obstacles that successfully passed the intersection
+            if (obs.direction in [ObstacleDirection.TOP, ObstacleDirection.BOTTOM] and
+                (obs.rect.y < 0 or obs.rect.y > HEIGHT)) or \
+               (obs.direction in [ObstacleDirection.LEFT, ObstacleDirection.RIGHT] and
+                (obs.rect.x < 0 or obs.rect.x > WIDTH)):
+                active_obstacles[obs.direction].remove(obs)
+                obstacles.remove(obs)
 
         for index, car in enumerate(cars):
             if car.get_is_alive():
@@ -121,12 +203,6 @@ def run_simulation(genomes, config):
                     car.is_alive = False
                     print(f"Car {i} is rotating too much.")
 
-                # Penalize for reversing
-                if car.speed < 0:
-                    genomes[i][1].fitness -= 5
-                    car.is_alive = False
-                    print(f"Car {i} is reversing.")
-
                 # Check collision with obstacles
                 for obs in obstacles:
                     if car.rect.colliderect(obs.rect):
@@ -137,6 +213,7 @@ def run_simulation(genomes, config):
                 genomes[i][1].fitness -= 1  # Penalize for crashing
 
         if remain_cars == 0 or generation_time > max_generation_time:
+            clear_obstacles()
             break
 
         for car in cars:
