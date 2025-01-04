@@ -9,6 +9,7 @@ from enum import Enum
 
 WIDTH, HEIGHT = 683, 384
 
+
 def run_simulation(genomes, config):
     pygame.init()
     win = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -48,14 +49,31 @@ def run_simulation(genomes, config):
     rotation_speed = 5
     max_generation_time = 1200
     generation_time = 0
+    obstacle_timer = 0
+    obstacle_interval = 120  # 5 seconds at 60 FPS
+
+    predefined_obstacles = [
+        (ObstacleInitialData.LEFT[0], ObstacleInitialData.LEFT[1], ObstacleInitialData.LEFT[2]),
+        (ObstacleInitialData.TOP[0], ObstacleInitialData.TOP[1], ObstacleInitialData.TOP[2])
+    ]
+    predefined_obstacle_index = 0
 
     while True:
         win.blit(map, (0, 0))
         pygame.draw.rect(win, (0, 255, 0), target)  # Draw target point
         generation_time += 1
+        obstacle_timer += 1
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 sys.exit(0)
+
+        # Generate new obstacles every 5 seconds
+        if obstacle_timer >= obstacle_interval:
+            obstacle_timer = 0
+            if predefined_obstacle_index < len(predefined_obstacles):
+                new_obstacle_pos, new_obstacle_speed, new_obstacle_rotation = predefined_obstacles[predefined_obstacle_index]
+                obstacles.append(ObstacleCar(map, WIDTH, HEIGHT, new_obstacle_pos, 30, 0, new_obstacle_speed, new_obstacle_rotation))
+                predefined_obstacle_index += 1
 
         # Move obstacle cars automatically
         for obs in obstacles:
@@ -98,7 +116,7 @@ def run_simulation(genomes, config):
                     print(f"Car {i} reached the target!")
 
                 # Penalize for excessive rotation
-                if car.total_rotation > 7000:
+                if car.total_rotation > 2000:
                     genomes[i][1].fitness -= 5
                     car.is_alive = False
                     print(f"Car {i} is rotating too much.")
@@ -139,7 +157,7 @@ def run(config_file):
     p.add_reporter(neat.StdOutReporter(True))
     stats = neat.StatisticsReporter()
     p.add_reporter(stats)
-    p.add_reporter(neat.Checkpointer(10)) # save checkpoint after ... generations
+    #p.add_reporter(neat.Checkpointer(10)) # save checkpoint after ... generations
     p.run(run_simulation, 100)  # number of generations
 
 
