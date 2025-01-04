@@ -29,9 +29,9 @@ priority_order = [
 
 stop_lines = {
     ObstacleDirection.TOP: 140 - car_size,
-    ObstacleDirection.BOTTOM: 234 - car_size,
+    ObstacleDirection.BOTTOM: 234 + car_size,
     ObstacleDirection.LEFT: 255 - car_size,
-    ObstacleDirection.RIGHT: 397 - car_size
+    ObstacleDirection.RIGHT: 397 + car_size
 }
 
 active_obstacles = {
@@ -47,19 +47,6 @@ def clear_obstacles():
     active_obstacles[ObstacleDirection.LEFT].clear()
     active_obstacles[ObstacleDirection.RIGHT].clear()
 
-def has_priority(current_dir):
-    # Check if any car in the direction to the right has priority and is near stop line
-    index = priority_order.index(current_dir)
-    right_priority = priority_order[(index - 1) % len(priority_order)]
-    for obs in active_obstacles[right_priority]:
-        if obs.speed > 0:
-            if (right_priority in [ObstacleDirection.TOP, ObstacleDirection.BOTTOM] and
-                abs(obs.rect.y - stop_lines[right_priority]) <= 5) or \
-               (right_priority in [ObstacleDirection.LEFT, ObstacleDirection.RIGHT] and
-                abs(obs.rect.x - stop_lines[right_priority]) <= 5):
-                return False
-    return True
-
 class ObstacleCar(Car):
     def __init__(self, map, win_width, win_height, start_pos, car_size, radars_count, speed, rotation, direction):
         super().__init__(map, win_width, win_height, start_pos, car_size, radars_count)
@@ -69,38 +56,61 @@ class ObstacleCar(Car):
         self.direction = direction
         self.stop_position = stop_lines[direction]
 
-    def auto_move(self):
-        if not has_priority(self.direction):
-            self.speed = 0  # Stop if no priority
+    def get_right_priority(self):
+        index = priority_order.index(self.direction)
+        return priority_order[(index - 1) % len(priority_order)]
+    
+    def get_oposite_direction(self):
+        index = priority_order.index(self.direction)
+        return priority_order[(index + 2) % len(priority_order)]
+
+    def is_at_stop_position(self):
+        if self.direction in [ObstacleDirection.TOP, ObstacleDirection.BOTTOM]:
+            return abs(self.rect.y - self.stop_position) <= 2
         else:
-            front_car = active_obstacles[self.direction][0] if active_obstacles[self.direction] else None
-            if front_car and front_car != self:
-                distance = 20
-                if self.direction in [ObstacleDirection.TOP, ObstacleDirection.BOTTOM]:
-                    if abs(self.rect.y - front_car.rect.y) > distance:
-                        self.speed = 1
-                    else:
-                        self.speed = 0
-                else:
-                    if abs(self.rect.x - front_car.rect.x) > distance:
-                        self.speed = 1
-                    else:
-                        self.speed = 0
-            else:
-                if self.direction in [ObstacleDirection.TOP, ObstacleDirection.BOTTOM]:
-                    if abs(self.rect.y - self.stop_position) > 5:
-                        self.speed = 1
-                    else:
-                        self.speed = 0
-                else:
-                    if abs(self.rect.x - self.stop_position) > 5:
-                        self.speed = 1
-                    else:
-                        self.speed = 0
+            return abs(self.rect.x - self.stop_position) <= 2
+
+    # Check if any other car is in the intersection
+    def is_intersection_busy(self):
+        for direction in active_obstacles:
+            for obs in active_obstacles[direction]:
+                if obs == self:
+                    continue
+                if (direction in [ObstacleDirection.TOP, ObstacleDirection.BOTTOM] and
+                    stop_lines[ObstacleDirection.TOP] < obs.rect.y < stop_lines[ObstacleDirection.BOTTOM]) or \
+                (direction in [ObstacleDirection.LEFT, ObstacleDirection.RIGHT] and
+                    stop_lines[ObstacleDirection.LEFT] < obs.rect.x < stop_lines[ObstacleDirection.RIGHT]):
+                    return True
+        return False
+
+    def check_right_priority(self):
+        right_priority = self.get_right_priority()
+        for obs in active_obstacles[right_priority]:
+            if (right_priority in [ObstacleDirection.TOP, ObstacleDirection.BOTTOM] and abs(obs.rect.y - stop_lines[right_priority]) <= 2) or \
+            (right_priority in [ObstacleDirection.LEFT, ObstacleDirection.RIGHT] and abs(obs.rect.x - stop_lines[right_priority]) <= 2):
+                return True
+        return False
+
+    def has_priority(self):    
+        if not self.is_at_stop_position():
+            return True
+        if self.is_intersection_busy():
+            print(f"car {self.direction} stopped, because the intersection is busy")
+            return False
+        if self.check_right_priority():
+            print(f"car {self.direction} stopped, because of right priority")
+            return False
+        
+        return True
+
+    def auto_move(self):
+        speed = self.speed
+        if not self.has_priority():
+            speed = 0  # Stop if no priority
 
         radians = math.radians(self.rotation)
-        self.rect.x += self.speed * math.sin(radians)
-        self.rect.y -= self.speed * math.cos(radians)
+        self.rect.x += speed * math.sin(radians)
+        self.rect.y -= speed * math.cos(radians)
 
 def run_simulation(genomes, config):
     pygame.init()
@@ -115,7 +125,7 @@ def run_simulation(genomes, config):
 
     # Initialize cars controlled by NEAT
     starting_positions = [(100, 190), (100, 190), (100, 190)]  # Adjusted starting positions
-    for i, (genome_id, g) in enumerate(genomes):
+    for i, (_, g) in enumerate(genomes):
         net = neat.nn.FeedForwardNetwork.create(g, config)
         nets.append(net)
         g.fitness = 0
@@ -139,11 +149,11 @@ def run_simulation(genomes, config):
             if event.type == pygame.QUIT:
                 sys.exit(0)
 
-        if obstacle_timer >= 30:
+        if obstacle_timer >= random.randint(30, 60):
             obstacle_timer = 0
             direction = random.choice(list(ObstacleDirection))
 
-            if len(active_obstacles[direction]) < 2:  # Max 2 obstacles per direction
+            if len(active_obstacles[direction]) < 1:  # Max 2 obstacles per direction
                 start_pos, speed, rotation = direction.value[:3]
                 new_obstacle = ObstacleCar(map, WIDTH, HEIGHT, start_pos, car_size, 0, speed, rotation, direction)
                 obstacles.append(new_obstacle)
@@ -155,10 +165,7 @@ def run_simulation(genomes, config):
             obs.draw(win)
 
             # Remove obstacles that successfully passed the intersection
-            if (obs.direction in [ObstacleDirection.TOP, ObstacleDirection.BOTTOM] and
-                (obs.rect.y < 0 or obs.rect.y > HEIGHT)) or \
-               (obs.direction in [ObstacleDirection.LEFT, ObstacleDirection.RIGHT] and
-                (obs.rect.x < 0 or obs.rect.x > WIDTH)):
+            if not obs.get_is_alive():
                 active_obstacles[obs.direction].remove(obs)
                 obstacles.remove(obs)
 
