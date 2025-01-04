@@ -19,6 +19,7 @@ class Car:
         self.is_alive = True
         self.distance = 0
         self.time_alive = 0
+        self.total_rotation = 0  # Track total rotation
 
     def move(self):
         if self.rect.centerx >= self.win_width:
@@ -50,7 +51,8 @@ class Car:
         x, y = self.rect.center
         if x <= 0 or x >= self.win_width or y <= 0 or y >= self.win_height or self.map.get_at((int(x), int(y))) == (255, 255, 255, 255):
             self.is_alive = False
-    
+            print(f"Car at position ({x}, {y}) collided and is no longer alive.")
+
     def radar(self, win, angle):
         x_center, y_center = self.rect.center
         length = 0
@@ -92,3 +94,6 @@ class Car:
 
     def get_is_alive(self):
         return self.is_alive
+
+    def update_rotation(self, rotation_change):
+        self.total_rotation += abs(rotation_change)
