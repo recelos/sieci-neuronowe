@@ -96,18 +96,6 @@ class Car:
     def update_rotation(self, rotation_change):
         self.total_rotation += abs(rotation_change)
 
-class ObstacleCar(Car):
-    def __init__(self, map, win_width, win_height, start_pos, speed, rotation):
-        super().__init__(map, win_width, win_height)
-        self.rect = self.image.get_rect(center=start_pos)
-        self.speed = speed
-        self.rotation = rotation
-
-    def auto_move(self):
-        radians = math.radians(self.rotation)
-        self.rect.x += self.speed * math.sin(radians)
-        self.rect.y -= self.speed * math.cos(radians)
-
 
 class ObstacleCar(Car):
     def __init__(self, map, win_width, win_height, start_pos, car_size, radars_count, speed, rotation):
