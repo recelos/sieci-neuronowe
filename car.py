@@ -1,19 +1,17 @@
 import pygame
 import math
 
-CAR_WIDTH = 10
-
 class Car:
-    def __init__(self, map, win_width, win_height):
+    def __init__(self, map, win_width, win_height, start_pos, car_size, radars_counts):
         car_sprite = pygame.image.load("./sprites/car.png")
         self.win_width, self.win_height = win_width, win_height
-        CAR_IMG = pygame.transform.scale(car_sprite, (CAR_WIDTH, int(CAR_WIDTH * car_sprite.get_height() / car_sprite.get_width())))
+        CAR_IMG = pygame.transform.scale(car_sprite, (car_size, int(car_size * car_sprite.get_height() / car_sprite.get_width())))
         self.image = CAR_IMG
-        self.start_pos = (90, 90)
+        self.start_pos = start_pos
         self.rect = self.image.get_rect(center=(self.start_pos[0], self.start_pos[1]))
         self.speed = 0
-        self.rotation = 0
-        self.radars_count = 6
+        self.rotation = 90
+        self.radars_count = radars_counts
         self.radars = [0] * self.radars_count
         self.map = map
         self.is_alive = True
@@ -97,3 +95,28 @@ class Car:
 
     def update_rotation(self, rotation_change):
         self.total_rotation += abs(rotation_change)
+
+class ObstacleCar(Car):
+    def __init__(self, map, win_width, win_height, start_pos, speed, rotation):
+        super().__init__(map, win_width, win_height)
+        self.rect = self.image.get_rect(center=start_pos)
+        self.speed = speed
+        self.rotation = rotation
+
+    def auto_move(self):
+        radians = math.radians(self.rotation)
+        self.rect.x += self.speed * math.sin(radians)
+        self.rect.y -= self.speed * math.cos(radians)
+
+
+class ObstacleCar(Car):
+    def __init__(self, map, win_width, win_height, start_pos, car_size, radars_count, speed, rotation):
+        super().__init__(map, win_width, win_height, start_pos, car_size, radars_count)
+        self.rect = self.image.get_rect(center=start_pos)
+        self.speed = speed
+        self.rotation = rotation
+
+    def auto_move(self):
+        radians = math.radians(self.rotation)
+        self.rect.x += self.speed * math.sin(radians)
+        self.rect.y -= self.speed * math.cos(radians)

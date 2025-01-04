@@ -1,8 +1,11 @@
 import os
 import pygame
-from car import Car
+from car import Car, ObstacleCar
 import neat
 import sys
+import random
+import math
+from enum import Enum
 
 WIDTH, HEIGHT = 683, 384
 
@@ -10,17 +13,34 @@ def run_simulation(genomes, config):
     pygame.init()
     win = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("NEAT Car Simulation")
-    map = pygame.image.load("./maps/map1.png")
+    map = pygame.image.load("./maps/crossing.png")
 
     nets = []
     cars = []
+    obstacles = []
+    target = pygame.Rect(660, 192, 20, 20)  # Adjusted target position
 
-    for genome_id, g in genomes:
+    # Initialize cars controlled by NEAT
+    starting_positions = [(100, 190), (100, 190), (100, 190)]  # Adjusted starting positions
+    for i, (genome_id, g) in enumerate(genomes):
         net = neat.nn.FeedForwardNetwork.create(g, config)
         nets.append(net)
         g.fitness = 0
 
-        cars.append(Car(map, WIDTH, HEIGHT, (90, 90), 10, config.genome_config.num_inputs))
+        cars.append(Car(map, WIDTH, HEIGHT, starting_positions[i % len(starting_positions)], 30, config.genome_config.num_inputs))
+
+    class ObstacleInitialData():
+        # pos_x, pos_y, speed, rotation
+        LEFT = [(10, 190), 1, 90]
+        RIGHT = [(660, 190), 1, 270]
+        TOP = [(341, 10), 1, 180]
+
+    obstacle_positions = [ObstacleInitialData.LEFT[0], ObstacleInitialData.RIGHT[0]]
+    obstacle_speeds = [ObstacleInitialData.LEFT[1], ObstacleInitialData.RIGHT[1]]
+    obstacle_rotations = [ObstacleInitialData.LEFT[2], ObstacleInitialData.RIGHT[2]]
+
+    for i in range(len(obstacle_positions)):
+        obstacles.append(ObstacleCar(map, WIDTH, HEIGHT, obstacle_positions[i], 30, 0, obstacle_speeds[i], obstacle_rotations[i]))
 
     clock = pygame.time.Clock()
     speed_interval = 0.1
@@ -31,10 +51,16 @@ def run_simulation(genomes, config):
 
     while True:
         win.blit(map, (0, 0))
+        pygame.draw.rect(win, (0, 255, 0), target)  # Draw target point
         generation_time += 1
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 sys.exit(0)
+
+        # Move obstacle cars automatically
+        for obs in obstacles:
+            obs.auto_move()
+            obs.draw(win)
 
         for index, car in enumerate(cars):
             if car.get_is_alive():
@@ -46,7 +72,7 @@ def run_simulation(genomes, config):
                     car.speed = min(car.speed + speed_interval, max_speed)
                 else:
                     car.speed = max(car.speed - speed_interval, -max_speed)
-                
+
                 if rotation_control > 0:
                     car.rotation += rotation_speed
                     car.update_rotation(rotation_speed)
@@ -60,22 +86,37 @@ def run_simulation(genomes, config):
                 remain_cars += 1
                 car.update(win)
                 genomes[i][1].fitness = car.reward()
+
+                # Reward minimizing the distance to the target
+                distance_to_target = math.hypot(target.centerx - car.rect.centerx, target.centery - car.rect.centery)
+                genomes[i][1].fitness += (1 / (distance_to_target + 1)) * 10
+
+                # Reward reaching the target
+                if car.rect.colliderect(target):
+                    genomes[i][1].fitness += 50
+                    car.is_alive = False
+                    print(f"Car {i} reached the target!")
+
                 # Penalize for excessive rotation
-                if car.total_rotation > 7000:  
+                if car.total_rotation > 7000:
                     genomes[i][1].fitness -= 5
                     car.is_alive = False
                     print(f"Car {i} is rotating too much.")
-                # Penalize for very low speed
-                if abs(car.speed) < 0.2: 
-                    #genomes[i][1].fitness -= 1
-                    #print(f"Car {i} is moving too slow.")
-                    pass
+
+                # Penalize for reversing
                 if car.speed < 0:
                     genomes[i][1].fitness -= 5
                     car.is_alive = False
                     print(f"Car {i} is reversing.")
+
+                # Check collision with obstacles
+                for obs in obstacles:
+                    if car.rect.colliderect(obs.rect):
+                        genomes[i][1].fitness -= 10
+                        car.is_alive = False
+                        print(f"Car {i} collided with obstacle.")
             else:
-                genomes[i][1].fitness -= 1  #penalize for crashing
+                genomes[i][1].fitness -= 1  # Penalize for crashing
 
         if remain_cars == 0 or generation_time > max_generation_time:
             break
@@ -85,20 +126,22 @@ def run_simulation(genomes, config):
                 car.draw(win)
 
         pygame.display.flip()
-        clock.tick(60) #limit 60 fps
+        clock.tick(60) # limit 60 fps
+
 
 def run(config_file):
     config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
                          neat.DefaultSpeciesSet, neat.DefaultStagnation,
                          config_file)
-    
+
     p = neat.Population(config)
 
     p.add_reporter(neat.StdOutReporter(True))
     stats = neat.StatisticsReporter()
     p.add_reporter(stats)
-    p.add_reporter(neat.Checkpointer(10)) #save checkpoint after ... generations
-    p.run(run_simulation, 100)  #number of generations
+    p.add_reporter(neat.Checkpointer(10)) # save checkpoint after ... generations
+    p.run(run_simulation, 100)  # number of generations
+
 
 if __name__ == "__main__":
     local_dir = os.path.dirname(__file__)

@@ -8,7 +8,7 @@ pygame.display.set_caption("NEAT Car Simulation")
 map = pygame.image.load("./maps/map2.png")
 
 def run():
-    car = Car(map, WIDTH, HEIGHT)
+    car = Car(map, WIDTH, HEIGHT, (90, 90), 10, 6)
     running = True
     clock = pygame.time.Clock()
     speed_interval = 0.1
