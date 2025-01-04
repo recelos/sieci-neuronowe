@@ -35,7 +35,7 @@ def run():
         if keys[pygame.K_RIGHT] and car.speed != 0:
             car.rotation += rotation_speed
 
-        car.update(win)
+        car.update(win, [])
 
         car.draw(win)
         pygame.display.flip()

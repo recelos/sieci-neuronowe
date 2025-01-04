@@ -58,7 +58,7 @@ def run_simulation(genomes, config):
         for i, car in enumerate(cars):
             if car.get_is_alive():
                 remain_cars += 1
-                car.update(win)
+                car.update(win, [])
                 genomes[i][1].fitness = car.reward()
                 # Penalize for excessive rotation
                 if car.total_rotation > 7000:  

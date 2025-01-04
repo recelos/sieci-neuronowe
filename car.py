@@ -51,20 +51,28 @@ class Car:
             self.is_alive = False
             print(f"Car at position ({x}, {y}) collided and is no longer alive.")
 
-    def radar(self, win, angle):
+    def radar(self, win, angle, obstacles):
         x_center, y_center = self.rect.center
         length = 0
         x1, y1 = x_center, y_center
         if x1 <= 0 or x1 >= self.win_width or y1 <= 0 or y1 >= self.win_height:
             return 1
 
-        while length < 50:
+        while length < 100:
             x1, y1 = x_center + length * math.sin(angle), y_center - length * math.cos(angle)
             
             if not (0 <= int(x1) < self.win_width and 0 <= int(y1) < self.win_height):
                 break
-
+            
             if self.map.get_at((int(x1), int(y1))) == (255, 255, 255, 255):
+                break
+            
+            collision = False
+            for obs in obstacles:
+                if obs.rect.collidepoint(x1, y1):
+                    collision = True
+                    break
+            if collision:
                 break
 
             length += 1
@@ -72,10 +80,10 @@ class Car:
         pygame.draw.circle(win, (0, 255, 0), (int(x1), int(y1)), 5)
         return math.hypot(x1 - x_center, y1 - y_center)
         
-    def check_radars(self, win):
+    def check_radars(self, win, obstacles):
         for i in range(self.radars_count):
             angle = math.radians(self.rotation - 90 + i * (180 // (self.radars_count - 1)))
-            self.radars[i] = self.radar(win, angle)
+            self.radars[i] = self.radar(win, angle, obstacles)
 
     def reward(self):
         # TODO: add punishment for idle standing
@@ -85,9 +93,9 @@ class Car:
     def get_input_data(self):
         return [radar / 50 for radar in self.radars]
 
-    def update(self, win):
+    def update(self, win, obstacles):
         self.move()
-        self.check_radars(win)
+        self.check_radars(win, obstacles)
         self.check_collision()
 
     def get_is_alive(self):
