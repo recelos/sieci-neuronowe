@@ -95,10 +95,10 @@ class ObstacleCar(Car):
         if not self.is_at_stop_position():
             return True
         if self.is_intersection_busy():
-            print(f"car {self.direction} stopped, because the intersection is busy")
+            #print(f"car {self.direction} stopped, because the intersection is busy")
             return False
         if self.check_right_priority():
-            print(f"car {self.direction} stopped, because of right priority")
+            #print(f"car {self.direction} stopped, because of right priority")
             return False
         
         return True
@@ -130,15 +130,13 @@ def run_simulation(genomes, config):
     nets = []
     cars = []
     obstacles = []
-    target = pygame.Rect(660, 192, 20, 20)  # Adjusted target position
+    target = pygame.Rect(660, 192, 20, 20)
 
-    # Initialize cars controlled by NEAT
-    starting_positions = [(100, 190), (100, 190), (100, 190)]  # Adjusted starting positions
+    starting_positions = [(100, 190), (100, 190), (100, 190)]
     for i, (_, g) in enumerate(genomes):
         net = neat.nn.FeedForwardNetwork.create(g, config)
         nets.append(net)
         g.fitness = 0
-
         cars.append(Car(map, WIDTH, HEIGHT, starting_positions[i % len(starting_positions)], car_size, config.genome_config.num_inputs))
 
     clock = pygame.time.Clock()
@@ -149,9 +147,12 @@ def run_simulation(genomes, config):
     generation_time = 0
     obstacle_timer = 0
 
+    # Track previous distances to encourage forward progress
+    previous_distances = [None] * len(cars)
+
     while True:
         win.blit(map, (0, 0))
-        pygame.draw.rect(win, (0, 255, 0), target)  # Draw target point
+        pygame.draw.rect(win, (0, 255, 0), target)
         generation_time += 1
         obstacle_timer += 1
         for event in pygame.event.get():
@@ -161,34 +162,29 @@ def run_simulation(genomes, config):
         if obstacle_timer >= random.randint(30, 60):
             obstacle_timer = 0
             direction = random.choice(list(ObstacleDirection))
-
-            if len(active_obstacles[direction]) < 1:  # Max 2 obstacles per direction
+            if len(active_obstacles[direction]) < 1:
                 start_pos, speed, rotation = direction.value[:3]
                 new_obstacle = ObstacleCar(map, WIDTH, HEIGHT, start_pos, car_size, 0, speed, rotation, direction)
                 obstacles.append(new_obstacle)
                 active_obstacles[direction].append(new_obstacle)
 
-        # Move and draw obstacles
         for obs in obstacles:
             obs.auto_move()
             obs.draw(win)
-
-            # Remove obstacles that successfully passed the intersection
             if not obs.get_is_alive():
                 active_obstacles[obs.direction].remove(obs)
                 obstacles.remove(obs)
 
-        for index, car in enumerate(cars):
+        # Network decisions
+        for i, car in enumerate(cars):
             if car.get_is_alive():
-                output = nets[index].activate(car.get_input_data())
-
+                output = nets[i].activate(car.get_input_data())
                 speed_control = output[0]
                 rotation_control = output[1]
                 if speed_control > 0:
                     car.speed = min(car.speed + speed_interval, max_speed)
                 else:
                     car.speed = max(car.speed - speed_interval, -max_speed)
-
                 if rotation_control > 0:
                     car.rotation += rotation_speed
                     car.update_rotation(rotation_speed)
@@ -201,46 +197,60 @@ def run_simulation(genomes, config):
             if car.get_is_alive():
                 remain_cars += 1
                 car.update(win, obstacles)
-                genomes[i][1].fitness = car.reward()
 
-                # Reward minimizing the distance to the target
+                # Distance-based incentive
                 distance_to_target = math.hypot(target.centerx - car.rect.centerx, target.centery - car.rect.centery)
-                genomes[i][1].fitness += (1 / (distance_to_target + 1)) * 10
+                distance_reward = (1 / (distance_to_target + 1)) * 2
+                genomes[i][1].fitness += distance_reward
 
-                # Reward reaching the target
+                # Additional reward for moving closer
+                if previous_distances[i] is not None and distance_to_target < previous_distances[i]:
+                    genomes[i][1].fitness += 0.5
+                previous_distances[i] = distance_to_target
+
+                # Small penalty for reversing
+                if car.speed < 0:
+                    genomes[i][1].fitness -= 0.1
+
+                # Big reward for reaching target
                 if car.rect.colliderect(target):
                     genomes[i][1].fitness += 50
                     car.is_alive = False
-                    print(f"Car {i} reached the target!")
 
-                # Penalize for excessive rotation
+                # Penalty for heavy rotation
                 if car.total_rotation > 2000:
                     genomes[i][1].fitness -= 5
                     car.is_alive = False
-                    print(f"Car {i} is rotating too much.")
 
-                # Check collision with obstacles
+                # Collisions
                 for obs in obstacles:
                     if car.rect.colliderect(obs.rect):
-                        genomes[i][1].fitness -= 10
                         car.is_alive = False
-                        print(f"Car {i} collided with obstacle.")
             else:
-                genomes[i][1].fitness -= 1  # Penalize for crashing
+                # Penalize crashing
+                if not car.recieved_reward:
+                    genomes[i][1].fitness -= 3
+                    car.recieved_reward = True
+                    print(f"Car {i} fitness: {genomes[i][1].fitness}")
 
+        # If no cars remain or generation took too long, end
         if remain_cars == 0 or generation_time > max_generation_time:
+            for i, car in enumerate(cars):
+                if car.get_is_alive():
+                    genomes[i][1].fitness -= 10  # penalize inactivity
             clear_obstacles()
             break
 
+        # Draw living cars
         for car in cars:
             if car.get_is_alive():
                 car.draw(win)
 
         pygame.display.flip()
-        clock.tick(60) # limit 60 fps
-
+        clock.tick(60)
 
 def run(config_file):
+
     config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
                          neat.DefaultSpeciesSet, neat.DefaultStagnation,
                          config_file)

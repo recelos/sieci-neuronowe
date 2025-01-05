@@ -18,6 +18,7 @@ class Car:
         self.distance = 0
         self.time_alive = 0
         self.total_rotation = 0  # Track total rotation
+        self.recieved_reward = False
 
     def move(self):
         if self.rect.centerx >= self.win_width:
@@ -84,9 +85,13 @@ class Car:
             self.radars[i] = self.radar(win, angle, obstacles)
 
     def reward(self):
-        # TODO: add punishment for idle standing
-        weight = 0.6
-        return self.distance * weight + self.time_alive * (1 - weight) / 50
+        # Emphasize distance traveled and slight reward for continuous movement.
+        # Penalize total inactivity so the car doesn't just stay alive without moving.
+        reward = self.distance * 0.8
+        reward += self.time_alive * 0.005  # small time-based reward
+        if self.speed < 0.1:  # idle penalty
+            reward -= 0.1
+        return reward
     
     def get_input_data(self):
         return [radar / 50 for radar in self.radars]
