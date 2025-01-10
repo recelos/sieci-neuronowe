@@ -6,12 +6,13 @@ import sys
 import random
 import math
 from enum import Enum
+import pickle
 
 WIDTH, HEIGHT = 683, 384
 
 car_size = 30
 
-obstacles_speed = 1.5
+obstacles_speed = 1.0
 obstacles_rot = 90
 
 class ObstacleDirection(Enum):
@@ -130,36 +131,49 @@ def run_simulation(genomes, config):
     nets = []
     cars = []
     obstacles = []
-    target = pygame.Rect(660, 192, 20, 20)
+    target = pygame.Rect(360, 0, 10, 10) #prosto
+    pre_target = pygame.Rect(target.x , target.y + 130, target.width, target.height)
+    #target = pygame.Rect(290, 352, 20, 20)  # Example target
+    #pre_target = pygame.Rect(target.x - 270, target.y + 25, target.width, target.height)
+    #penalty_area = pygame.Rect(0, 0, 660, 200)  # Example penalty area
+    penalty_area = pygame.Rect(0, 0, 2, 2)  
+    pre_target_reached = False
 
-    starting_positions = [(100, 190), (100, 190), (100, 190)]
+    starting_positions = [(100, 220), (100, 220), (100, 220)]
     for i, (_, g) in enumerate(genomes):
         net = neat.nn.FeedForwardNetwork.create(g, config)
         nets.append(net)
         g.fitness = 0
-        cars.append(Car(map, WIDTH, HEIGHT, starting_positions[i % len(starting_positions)], car_size, config.genome_config.num_inputs))
-
+        new_car = Car(map, WIDTH, HEIGHT, starting_positions[i % len(starting_positions)], car_size, config.genome_config.num_inputs)
+        new_car.did_rotate = False  # track turn usage
+        cars.append(new_car)
+ 
     clock = pygame.time.Clock()
     speed_interval = 0.1
-    max_speed = 2
-    rotation_speed = 5
-    max_generation_time = 1200
+    max_speed = 1.5
+    rotation_speed = 3
+    max_generation_time = 2200
     generation_time = 0
     obstacle_timer = 0
 
     # Track previous distances to encourage forward progress
     previous_distances = [None] * len(cars)
 
+    # Font for displaying fitness
+    font = pygame.font.Font(None, 36)
+
     while True:
         win.blit(map, (0, 0))
         pygame.draw.rect(win, (0, 255, 0), target)
+        pygame.draw.rect(win, (255, 255, 0), pre_target)
+        pygame.draw.rect(win, (255, 0, 0), penalty_area, 2)  # Draw penalty area
         generation_time += 1
         obstacle_timer += 1
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 sys.exit(0)
 
-        if obstacle_timer >= random.randint(30, 60):
+        if obstacle_timer >= random.randint(5, 15):
             obstacle_timer = 0
             direction = random.choice(list(ObstacleDirection))
             if len(active_obstacles[direction]) < 1:
@@ -177,10 +191,12 @@ def run_simulation(genomes, config):
 
         # Network decisions
         for i, car in enumerate(cars):
-            if car.get_is_alive():
-                output = nets[i].activate(car.get_input_data())
-                speed_control = output[0]
-                rotation_control = output[1]
+                if car.get_is_alive():
+                    output = nets[i].activate(car.get_input_data())
+                    speed_control = output[0]
+                    rotation_control = output[1]
+                    if rotation_control != 0:
+                        car.did_rotate = True
                 if speed_control > 0:
                     car.speed = min(car.speed + speed_interval, max_speed)
                 else:
@@ -197,16 +213,12 @@ def run_simulation(genomes, config):
             if car.get_is_alive():
                 remain_cars += 1
                 car.update(win, obstacles)
-
                 # Distance-based incentive
                 distance_to_target = math.hypot(target.centerx - car.rect.centerx, target.centery - car.rect.centery)
-                distance_reward = (1 / (distance_to_target + 1)) * 2
-                genomes[i][1].fitness += distance_reward
+                distance_to_pre_target = math.hypot(pre_target.centerx - car.rect.centerx, pre_target.centery - car.rect.centery)
+                #distance_reward = (1 / (distance_to_target + 1)) * 0.01
+                #genomes[i][1].fitness += distance_reward
 
-                # Additional reward for moving closer
-                if previous_distances[i] is not None and distance_to_target < previous_distances[i]:
-                    genomes[i][1].fitness += 0.5
-                previous_distances[i] = distance_to_target
 
                 # Small penalty for reversing
                 if car.speed < 0:
@@ -216,28 +228,47 @@ def run_simulation(genomes, config):
                 if car.rect.colliderect(target):
                     genomes[i][1].fitness += 50
                     car.is_alive = False
+                    print(f"Car {i} reached target")
+
+                if car.rect.colliderect(pre_target) and not pre_target_reached:
+                    pre_target_reached = True
+                    genomes[i][1].fitness += 40
 
                 # Penalty for heavy rotation
-                if car.total_rotation > 2000:
-                    genomes[i][1].fitness -= 5
+                if car.total_rotation > 1500:
+                    genomes[i][1].fitness -= 15
                     car.is_alive = False
+
+                # Penalty for being in the penalty area
+                if car.rect.colliderect(penalty_area):
+                    genomes[i][1].fitness -= 0.01
 
                 # Collisions
                 for obs in obstacles:
                     if car.rect.colliderect(obs.rect):
                         car.is_alive = False
             else:
-                # Penalize crashing
                 if not car.recieved_reward:
-                    genomes[i][1].fitness -= 3
+                    genomes[i][1].fitness -= 20
+                    genomes[i][1].fitness += (1 / (distance_to_target + 1)) * 5000
                     car.recieved_reward = True
+                    if not car.did_rotate:
+                        # Reduce penalty for not turning
+                        genomes[i][1].fitness -= 20
                     print(f"Car {i} fitness: {genomes[i][1].fitness}")
 
         # If no cars remain or generation took too long, end
         if remain_cars == 0 or generation_time > max_generation_time:
-            for i, car in enumerate(cars):
-                if car.get_is_alive():
-                    genomes[i][1].fitness -= 10  # penalize inactivity
+            if remain_cars == 0:
+                print("All cars crashed")
+            else:
+                print("Generation time exceeded")
+            max_fitness = max([g.fitness for _, g in genomes])
+            min_fitness = min([g.fitness for _, g in genomes if g.fitness is not None])
+            avg_fitness = sum([g.fitness for _, g in genomes]) / len(genomes)
+            print(f"Max fitness: {max_fitness}")
+            print(f"Min fitness: {min_fitness}")
+            print(f"Avg fitness: {avg_fitness}")
             clear_obstacles()
             break
 
@@ -245,6 +276,13 @@ def run_simulation(genomes, config):
         for car in cars:
             if car.get_is_alive():
                 car.draw(win)
+
+        # Display fitness information
+        max_fitness = max([g.fitness for _, g in genomes])
+        min_fitness = min([g.fitness for _, g in genomes if g.fitness is not None])
+        avg_fitness = sum([g.fitness for _, g in genomes]) / len(genomes)
+        fitness_text = font.render(f"Max: {max_fitness:.2f} Min: {min_fitness:.2f} Avg: {avg_fitness:.2f}", True, (255, 0, 0))
+        win.blit(fitness_text, (10, 10))
 
         pygame.display.flip()
         clock.tick(60)
@@ -261,7 +299,10 @@ def run(config_file):
     stats = neat.StatisticsReporter()
     p.add_reporter(stats)
     #p.add_reporter(neat.Checkpointer(10)) # save checkpoint after ... generations
-    p.run(run_simulation, 100)  # number of generations
+
+    winner = p.run(run_simulation, 100)  # number of generations
+    with open("winner_genome.pkl", "wb") as f:
+    pickle.dump(winner, f)
 
 
 if __name__ == "__main__":

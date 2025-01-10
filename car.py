@@ -84,15 +84,6 @@ class Car:
             angle = math.radians(self.rotation - 90 + i * (180 // (self.radars_count - 1)))
             self.radars[i] = self.radar(win, angle, obstacles)
 
-    def reward(self):
-        # Emphasize distance traveled and slight reward for continuous movement.
-        # Penalize total inactivity so the car doesn't just stay alive without moving.
-        reward = self.distance * 0.8
-        reward += self.time_alive * 0.005  # small time-based reward
-        if self.speed < 0.1:  # idle penalty
-            reward -= 0.1
-        return reward
-    
     def get_input_data(self):
         return [radar / 50 for radar in self.radars]
 
