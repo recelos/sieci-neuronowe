@@ -131,10 +131,8 @@ def run_simulation(genomes, config):
     nets = []
     cars = []
     obstacles = []
-    target = pygame.Rect(360, 0, 10, 10) #prosto
-    pre_target = pygame.Rect(target.x , target.y + 130, target.width, target.height)
-    #target = pygame.Rect(290, 352, 20, 20)  # Example target
-    #pre_target = pygame.Rect(target.x - 270, target.y + 25, target.width, target.height)
+    target = pygame.Rect(620, 210, 10, 10)  # Example target
+    pre_target = pygame.Rect(target.x - 200, target.y + 10, target.width, target.height)
     #penalty_area = pygame.Rect(0, 0, 660, 200)  # Example penalty area
     penalty_area = pygame.Rect(0, 0, 2, 2)  
     pre_target_reached = False
@@ -300,8 +298,8 @@ def run(config_file):
     p.add_reporter(stats)
     #p.add_reporter(neat.Checkpointer(10)) # save checkpoint after ... generations
 
-    winner = p.run(run_simulation, 50)  # number of generations
-    with open("winner_genome.pkl", "wb") as f:
+    winner = p.run(run_simulation, 7)  # number of generations
+    with open("winner_genome_straight.pkl", "wb") as f:
         pickle.dump(winner, f)
 
 if __name__ == "__main__":
