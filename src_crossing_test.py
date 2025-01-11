@@ -133,7 +133,7 @@ def run_game(config_file):
     )
 
     # Wczytaj wytrenowany genom i stwórz sieć
-    with open("winner_genome_straight.pkl", "rb") as f:
+    with open("winner_genome_right.pkl", "rb") as f:
         winner = pickle.load(f)
     winner_net = neat.nn.FeedForwardNetwork.create(winner, config)
 
@@ -158,8 +158,8 @@ def run_game(config_file):
     max_generation_time = 2200
     obstacle_timer = 0
 
-    target = pygame.Rect(620, 210, 10, 10)  # Example target
-    pre_target = pygame.Rect(target.x - 200, target.y + 10, target.width, target.height)
+    target = pygame.Rect(270, 345, 10, 10)  # Example target
+    pre_target = pygame.Rect(target.x, target.y - 95, target.width, target.height)
     penalty_area = pygame.Rect(0, 0, 2, 2) 
 
     while running:
@@ -207,6 +207,9 @@ def run_game(config_file):
                 if rotation_control > 0:
                     car.rotation += rotation_speed
                     car.update_rotation(rotation_speed)
+                elif rotation_control < 0:
+                    car.rotation -= rotation_speed
+                    car.update_rotation(-rotation_speed)
                 else:
                     car.rotation -= rotation_speed
                     car.update_rotation(-rotation_speed)

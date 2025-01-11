@@ -30,7 +30,7 @@ class Car:
         if self.rect.centery >= self.win_height:
             self.rect.centery = self.win_height - 1
         
-        self.rotation = min(self.rotation, 90)
+        #self.rotation = min(self.rotation, 90)
         radians = math.radians(self.rotation)
         self.rect.x += self.speed * math.sin(radians)
         self.rect.y -= self.speed * math.cos(radians)
