@@ -131,10 +131,9 @@ def run_simulation(genomes, config):
     nets = []
     cars = []
     obstacles = []
-    target = pygame.Rect(270, 345, 10, 10)  # Example target
-    pre_target = pygame.Rect(target.x, target.y - 65, target.width, target.height)
-    #penalty_area = pygame.Rect(0, 0, 660, 200)  # Example penalty area
-    penalty_area = pygame.Rect(0, 0, 2, 2)  
+    target = pygame.Rect(360, 0, 10, 10)
+    pre_target = pygame.Rect(target.x, target.y + 150, target.width, target.height)
+    penalty_area = pygame.Rect(0, 0, 2, 2)
     pre_target_reached = False
 
     starting_positions = [(100, 220), (100, 220), (100, 220)]
@@ -219,9 +218,9 @@ def run_simulation(genomes, config):
                 distance_to_pre_target = math.hypot(pre_target.centerx - car.rect.centerx, pre_target.centery - car.rect.centery)
                 #distance_reward = (1 / (distance_to_target + 1)) * 0.01
                 #genomes[i][1].fitness += distance_reward
-                if previous_distances[i] is not None:
-                    if distance_to_target < previous_distances[i]:
-                        genomes[i][1].fitness += 0.1
+                #if previous_distances[i] is not None:
+                #    if distance_to_target < previous_distances[i]:
+                #        genomes[i][1].fitness += 0.1
                     
                 previous_distances[i] = distance_to_target
                 # Small penalty for reversing
@@ -236,10 +235,10 @@ def run_simulation(genomes, config):
 
                 if car.rect.colliderect(pre_target) and not pre_target_reached:
                     pre_target_reached = True
-                    genomes[i][1].fitness += 20
+                    genomes[i][1].fitness += 50
 
                 # Penalty for heavy rotation
-                if car.total_rotation > 1500:
+                if car.total_rotation > 3000:
                     genomes[i][1].fitness -= 15
                     car.is_alive = False
 
@@ -254,7 +253,7 @@ def run_simulation(genomes, config):
             else:
                 if not car.recieved_reward:
                     genomes[i][1].fitness -= 20
-                    genomes[i][1].fitness += (1 / (distance_to_target + 1)) * 3000
+                    genomes[i][1].fitness += (1 / (distance_to_target + 1)) * 4000
                     car.recieved_reward = True
                     if not car.did_rotate:
                         # Reduce penalty for not turning
@@ -304,8 +303,8 @@ def run(config_file):
     p.add_reporter(stats)
     #p.add_reporter(neat.Checkpointer(10)) # save checkpoint after ... generations
 
-    winner = p.run(run_simulation, 50)  # number of generations
-    with open("winner_genome_right.pkl", "wb") as f:
+    winner = p.run(run_simulation, 70)  # number of generations
+    with open("winner_genome_left.pkl", "wb") as f:
         pickle.dump(winner, f)
 
 if __name__ == "__main__":
