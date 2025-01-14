@@ -133,7 +133,7 @@ def run_game(config_file):
     )
 
     # Wczytaj wytrenowany genom i stwórz sieć
-    with open("winner_genome_left.pkl", "rb") as f:
+    with open("220.pkl", "rb") as f:
         winner = pickle.load(f)
     winner_net = neat.nn.FeedForwardNetwork.create(winner, config)
 

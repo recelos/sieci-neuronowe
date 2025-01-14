@@ -227,6 +227,9 @@ def run_simulation(genomes, config):
                 if car.speed < 0:
                     genomes[i][1].fitness -= 0.2
 
+                if car.speed == 0:
+                    genomes[i][1].fitness += 0.01
+
                 # Big reward for reaching target
                 if car.rect.colliderect(target):
                     genomes[i][1].fitness += 50
@@ -290,24 +293,27 @@ def run_simulation(genomes, config):
         pygame.display.flip()
         clock.tick(60)
 
-def run(config_file):
-
+def run(config_file, generations=50, output_file="winner_genome.pkl"):
     config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
                          neat.DefaultSpeciesSet, neat.DefaultStagnation,
                          config_file)
-
     p = neat.Population(config)
-
     p.add_reporter(neat.StdOutReporter(True))
     stats = neat.StatisticsReporter()
     p.add_reporter(stats)
-    #p.add_reporter(neat.Checkpointer(10)) # save checkpoint after ... generations
-
-    winner = p.run(run_simulation, 70)  # number of generations
-    with open("winner_genome_left.pkl", "wb") as f:
+    winner = p.run(run_simulation, generations)
+    with open(output_file, "wb") as f:
         pickle.dump(winner, f)
 
 if __name__ == "__main__":
     local_dir = os.path.dirname(__file__)
     config_path = os.path.join(local_dir, 'config-feedforward.txt')
-    run(config_path)
+    if len(sys.argv) > 1:
+        generations = int(sys.argv[1])
+    else:
+        generations = 50
+    if len(sys.argv) > 2:
+        output_file = sys.argv[2]
+    else:
+        output_file = "winner_genome.pkl"
+    run(config_path, generations, output_file)
