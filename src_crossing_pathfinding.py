@@ -131,8 +131,8 @@ def run_simulation(genomes, config):
     nets = []
     cars = []
     obstacles = []
-    target = pygame.Rect(360, 0, 10, 10)
-    pre_target = pygame.Rect(target.x, target.y + 150, target.width, target.height)
+    target = pygame.Rect(650, 210, 10, 10)
+    pre_target = pygame.Rect(target.x - 250, target.y , target.width, target.height)
     penalty_area = pygame.Rect(0, 0, 2, 2)
     pre_target_reached = False
 
