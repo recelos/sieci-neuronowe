@@ -133,7 +133,7 @@ def run_game(config_file):
     )
 
     # Wczytaj wytrenowany genom i stwórz sieć
-    with open("200.pkl", "rb") as f:
+    with open("220.pkl", "rb") as f:
         winner = pickle.load(f)
     winner_net = neat.nn.FeedForwardNetwork.create(winner, config)
 
@@ -158,8 +158,8 @@ def run_game(config_file):
     max_generation_time = 2200
     obstacle_timer = 0
 
-    target = pygame.Rect(650, 210, 10, 10)
-    pre_target = pygame.Rect(target.x - 250, target.y , target.width, target.height)
+    target = pygame.Rect(265, 360, 10, 10)
+    pre_target = pygame.Rect(target.x, target.y - 100, target.width, target.height)
     penalty_area = pygame.Rect(0, 0, 2, 2)
 
     while running:
